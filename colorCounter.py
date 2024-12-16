@@ -1,61 +1,58 @@
+import subprocess
+import sys
 from PIL import Image
 import argparse
 import json
 import webbrowser
 
-# Arguments for the script
 
-parser = argparse.ArgumentParser(description='Find the count of pixels for each unique color in the image')
-parser.add_argument('image', nargs='?', default='.', help='Image to count')
+# Ensure Pillow is installed
+def install_package(package):
+    try:
+        __import__(package)
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", package])
 
+
+install_package('PIL')
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(
+    description='Count unique pixel colors in an image')
+parser.add_argument('image',
+                    nargs='?',
+                    default='.',
+                    help='Image file to process')
 args = parser.parse_args()
 
+# Open the image
 image = Image.open(args.image)
-colorCount = {} # hashtable / object to hold my values
+colorCount = {}  # Dictionary to store color counts
 
-imageData = image.getdata() # using pillow library to get the image data
+# Process image data
+for pixel in image.getdata():
+    if isinstance(pixel, tuple):
+        key = str(pixel)
+    else:
+        key = str((pixel, pixel, pixel, 1))
+    colorCount[key] = colorCount.get(key, 0) + 1
 
-for x in (imageData):
-    if type(x) is tuple:  # if the value is a tuple ex. (1,0,0,1)
-        if len(x) == 4:
-          (R, B, G, Opacity) = x # unpack the tuple
-          key = "({0}, {1}, {2}, {3})".format(R, B, G, Opacity) # convert the tuple into string format to easier set up JSON format keys later
-          if key in colorCount:
-             colorCount[key] += 1
-          else:
-             colorCount[key] = 1
-        else:  
-          (R, B, G) = x # unpack the tuple
-          key = "({0}, {1}, {2})".format(R, B, G) # convert the tuple into string format to easier set up JSON format keys later
-          if key in colorCount:
-             colorCount[key] += 1
-          else:
-             colorCount[key] = 1   
-    else: # if not a tuple, it will be a single integer
-        key = "({0}, {1}, {2}, {3})".format(x, x, x, 1) # the data returned by pillow gives 1 integer for any (x, x, x, 1) color, so I prepped it for easy HTML usage
-        if key in colorCount:
-            colorCount[key] += 1
-        else:
-            colorCount[key] = 1
-    
+# Convert dictionary to JSON
+dataJSON = json.dumps(colorCount)
 
-dataJSON = json.dumps(colorCount) # convert to JSON
+# Create an HTML file for visualization
+with open('pixelCounter.html', 'w') as f:
+    html = f"""
+    <html>
+    <head><title>Pixel Counter</title></head>
+    <body>
+        <img src="{args.image}" alt="Image">
+        <pre>{dataJSON}</pre>
+    </body>
+    </html>
+    """
+    f.write(html)
 
-# This section creates a VERY barebones HTML file and displays the image with the JSON of the colors/counts for visualization purposes.
-# It is meant to be deleted and replaced with whatever you want the JSON data to be used for.
-
-f = open('pixelCounter.html','w')
-
-html = """
-<html>
-<head>
-<title>PixelCounter</title>
-</head>
-<body>
-<img src="./{img}" alt="nothing">
-<p>{data}</p>
-</body>
-</html>""".format(img = args.image, data = dataJSON)
-
-f.write(html)
-f.close()
+# Open the HTML file in a web browser
+webbrowser.open('pixelCounter.html')
